@@ -99,7 +99,8 @@ void setup()
   nano.setReadPower(500); //5.00 dBm. Higher values may caues USB port to brown out
 
 String tagInfo0="";
-tagInfo0+=String(myData.winnerRSSI[0]);
+if (myData.winnerRSSI[0]>-100){tagInfo0+="-0";tagInfo0+=abs(myData.winnerRSSI[0]);}
+else tagInfo0+=String(myData.winnerRSSI[0]);
 tagInfo0+=",";
 for (uint8_t i = 0; i < 12; i++){
   if (myData.tagEPC[0][i]==0) {tagInfo0+="00";}
@@ -108,7 +109,8 @@ for (uint8_t i = 0; i < 12; i++){
 }
 
 String tagInfo1="";
-tagInfo1+=String(myData.winnerRSSI[1]);
+if (myData.winnerRSSI[1]>-100){tagInfo1+="-0";tagInfo1+=abs(myData.winnerRSSI[1]);}
+else tagInfo1+=String(myData.winnerRSSI[1]);
 tagInfo1+=",";
 for (uint8_t i = 0; i < 12; i++){
   if (myData.tagEPC[1][i]==0) {tagInfo1+="00";}
@@ -117,7 +119,8 @@ for (uint8_t i = 0; i < 12; i++){
 }
 
 String tagInfo2="";
-tagInfo2+=String(myData.winnerRSSI[2]);
+if (myData.winnerRSSI[2]>-100){tagInfo2+="-0";tagInfo2+=abs(myData.winnerRSSI[2]);}
+else tagInfo2+=String(myData.winnerRSSI[2]);
 tagInfo2+=",";
 for (uint8_t i = 0; i < 12; i++){
   if (myData.tagEPC[2][i]==0) {tagInfo2+="00";}
