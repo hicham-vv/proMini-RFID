@@ -48,15 +48,18 @@ bool parseResponse(uint8_t ID, uint8_t msg);
 void setup()
 {
   Serial.begin(115200);
-  Serial.println("turning off rfid module");
+  Serial.println("Setup Start");
   // pinMode(RFIDEN,OUTPUT);
   // digitalWrite(RFIDEN,LOW);
   Wire.begin(8);
   Wire.onRequest(requestEvent); // register event
   Wire.onReceive(receiveEvent); // register event
-  nano.disableDebugging();
-  // nano.enableDebugging();
-  // setupNano();
+  // nano.disableDebugging();
+  nano.enableDebugging();
+  setupNano();
+  //   Serial.println("STOP");
+  // while (1);
+  
 }
 
 void loop(){
@@ -180,8 +183,8 @@ bool setupNano(){
     nano.setBaud(38400); //Tell the module to go to the chosen baud rate. Ignore the response msg
     softSerial.begin(38400); //Start the software serial port, this time at user's chosen baud rate
     while (!softSerial); //Wait for port to open
-    while (softSerial.available()) softSerial.read();delay(200);
-    if(nanoGetVersion()){
+    while (softSerial.available()) softSerial.read();delay(500);
+    // if(nanoGetVersion()){
       if (nanoSetTagProtocol()){//Set protocol to GEN2
         if (nanoSetAntennaPort()){
           if (nanoSetRegion(REGION_EUROPE)){
@@ -191,7 +194,7 @@ bool setupNano(){
           }else return false;
         }else return false;
       }else return false;
-    }else return false;
+    // }else return false;
   } 
     rfidBusy=false;
 }
