@@ -9,7 +9,7 @@ uint16_t start = 0;
 uint16_t tagFoundCount=0;
 
 
-#define RFIDEN 4
+#define RFIDEN A0
 String tagInfo="";
 uint8_t M=0;
 char allTags[89]={0};
@@ -25,7 +25,7 @@ message myData; // créer une structure message nommé myData
 volatile bool rfidBusy=false;
 unsigned long sentStartTime;
 unsigned long lastSentTime;
-
+bool receptionEvent = false;
 RFID nano; //Create instance
 byte zeroEPC[12]={0x00};
 byte mmyEPC[12]; //Most EPCs are 12 bytes
@@ -37,100 +37,32 @@ byte a=0;
 void requestEvent();
 void receiveEvent(int howMany);
 void restartRFID();
+bool setupNano();
+bool nanoGetVersion();
+bool nanoSetTagProtocol();
+bool nanoSetAntennaPort();
+bool nanoSetRegion(uint8_t nanoRegion);
+bool nanoSetReadPower(uint16_t nanoPower);
+bool nanoStopReading();
+bool parseResponse(uint8_t ID, uint8_t msg);
 void setup()
 {
   Serial.begin(115200);
+  Serial.println("turning off rfid module");
+  // pinMode(RFIDEN,OUTPUT);
+  // digitalWrite(RFIDEN,LOW);
   Wire.begin(8);
   Wire.onRequest(requestEvent); // register event
   Wire.onReceive(receiveEvent); // register event
-/*********************Nano setup*************************/
-  nano.msg[0]=1;
-  bool nanoStartup = false;
-  while (!nanoStartup){
-    rfidBusy=true;
-    nano.begin(softSerial);
-    softSerial.begin(115200); //Start software serial at 115200
-    nano.setBaud(38400); //Tell the module to go to the chosen baud rate. Ignore the response msg
-    softSerial.begin(38400); //Start the software serial port, this time at user's chosen baud rate
-    while (!softSerial); //Wait for port to open
-    while (softSerial.available()) softSerial.read();//200ms
-    nano.getVersion();
-    switch (nano.msg[0])
-    {
-    case ALL_GOOD:
-      Serial.println("RFID started successfully");
-      nano.setTagProtocol(); //Set protocol to GEN2
-      nano.setAntennaPort(); //Set TX/RX antenna ports
-      rfidBusy=false;
-      nanoStartup=true;
-      break;
-    case ERROR_WRONG_OPCODE_RESPONSE:// baud rate is correct but the module is doing a ccontinuous read
-      nano.stopReading();
-      Serial.println(F("Module continuously reading. Asking it to stop..."));
-      delay(1500);
-      rfidBusy=false;
-      nanoStartup=true;
-      break;
-    case ERROR_COMMAND_RESPONSE_TIMEOUT:
-      Serial.println("ERROR_COMMAND_RESPONSE_TIMEOUT");
-      break;
-    case ERROR_CORRUPT_RESPONSE:
-      Serial.println("ERROR_CORRUPT_RESPONSE");
-      
-      break;
-    case ERROR_UNKNOWN_OPCODE:
-      Serial.println("ERROR_UNKNOWN_OPCODE");
-      
-      break;
-    case RESPONSE_IS_TEMPERATURE:
-      Serial.println("RESPONSE_IS_TEMPERATURE");
-      
-      break;
-    case RESPONSE_IS_KEEPALIVE:
-      Serial.println("RESPONSE_IS_KEEPALIVE");
-      
-      break;
-    case RESPONSE_IS_TEMPTHROTTLE:
-      Serial.println("RESPONSE_IS_TEMPTHROTTLE");
-      
-      break;
-    case RESPONSE_IS_TAGFOUND:
-      Serial.println("RESPONSE_IS_TAGFOUND");
-      
-      break;
-    case RESPONSE_IS_NOTAGFOUND:
-      Serial.println("RESPONSE_IS_NOTAGFOUND");
-      
-      break;
-    case RESPONSE_IS_UNKNOWN:
-      Serial.println("RESPONSE_IS_UNKNOWN");
-      
-      break;
-    case RESPONSE_SUCCESS:
-      Serial.println("RESPONSE_SUCCESS");
-      
-      break;
-    case RESPONSE_FAIL:
-      Serial.println("RESPONSE_FAIL");
-      
-      break;
-    default:
-      Serial.println("Something is wrong with the RFID module... restarting it");
-      restartRFID();
-      break;
-    }
-    nano.getVersion();
-  } 
-
-/********************************************************/
+  nano.disableDebugging();
+  // nano.enableDebugging();
+  // setupNano();
 }
 
 void loop(){
-if (start==1){   
-  Serial.println("Loop Start =1");
-  rfidBusy=true;
-  nano.setRegion(REGION_EUROPE); //Set to North America
-  nano.setReadPower(pwr); //5.00 dBm. Higher values may caues USB port to brown out
+if (receptionEvent){
+  receptionEvent=false;
+  setupNano();
   nano.startReading(); //Begin scanning for tags
   previousMillis=millis();
   while((millis()-previousMillis)<time){
@@ -184,30 +116,22 @@ if (start==1){
   }
   nano.stopReading();
   delay(1000);
-  nano.setReadPower(500); //5.00 dBm. Higher values may caues USB port to brown out
   rfidBusy=false;
-  start=0;
-}else{
-    // rfidBusy=true;
-    rfidBusy=false;
-    nano.stopReading();
-    delay(1000);
-    nano.setReadPower(500); //5.00 dBm. Higher values may caues USB port to brown out
-  }
-}  
+}
+}
 void restartRFID(){
   rfidBusy=true;
   Serial.println("restarting the RFID module");
   pinMode(RFIDEN,OUTPUT);
   digitalWrite(RFIDEN,LOW);
   delay(1000);
-  pinMode(RFIDEN,INPUT);
-  delay(1000);
+  digitalWrite(RFIDEN,HIGH);
   rfidBusy=false;
 }
-void requestEvent() {
-  if (M<10 & !rfidBusy)
+void requestEvent(){
+  if ((M<10) && (!rfidBusy))
   {
+    // digitalWrite(RFIDEN,LOW);
     tagInfo="";
     for (uint8_t i = 0; i < 12; i++){
       if (myData.tagEPC[M][i]==0){
@@ -223,6 +147,7 @@ void requestEvent() {
     for (uint8_t j = 0; j < 12; j++){
       myData.tagEPC[M-1][j]={{0x00}};
     }
+    // digitalWrite(RFIDEN,LOW);
 }
 void receiveEvent(int howMany) {
   M=0;tagFoundCount=0;
@@ -241,32 +166,142 @@ void receiveEvent(int howMany) {
     time= command.substring(ind1+1,ind2).toInt(); Serial.print("time = ");Serial.println(time);
     pwr = command.substring(ind2+1,strlen(command.c_str())).toInt();Serial.print("pwr = "); Serial.println(pwr);
   }
+  receptionEvent=true;
+  // digitalWrite(RFIDEN,HIGH);
 }
-boolean setupNano(long baudRate)
-{
-  // nano.begin(softSerial); //Tell the library to communicate over software serial port
-  // softSerial.begin(baudRate); //For this test, assume module is already at our desired baud rate
-  // while (!softSerial); //Wait for port to open
-  // while (softSerial.available()) softSerial.read();delay(250);
-  // nano.getVersion();
-  // if (nano.msg[0] == ERROR_WRONG_OPCODE_RESPONSE){
-  //   nano.stopReading();
-  //   Serial.println(F("Module continuously reading. Asking it to stop..."));
-  //   delay(1500);
-  // }
-  // else{
+bool setupNano(){
+  nano.msg[0]=1;
+  bool nanoStartupOK = false;
+  // digitalWrite(RFIDEN,HIGH);
+  while (!nanoStartupOK){
+    rfidBusy=true;
+    nano.begin(softSerial);
     softSerial.begin(115200); //Start software serial at 115200
-    Serial.println("softSerial.begin(115200);");
-    nano.setBaud(baudRate); //Tell the module to go to the chosen baud rate. Ignore the response msg
-    Serial.println("nano.setBaud(baudRate);");
-    softSerial.begin(baudRate); //Start the software serial port, this time at user's chosen baud rate
-    Serial.println("softSerial.begin(baudRate);");
-  // }
-  delay(300);
-  nano.getVersion();
-  Serial.print("nano.msg[0]  = ");Serial.println(nano.msg[0]);
-  if (nano.msg[0] != ALL_GOOD) return (false); //Something is not right
-  nano.setTagProtocol(); //Set protocol to GEN2
-  nano.setAntennaPort(); //Set TX/RX antenna ports to 1
-  return (true); //We are ready to rock
+    nano.setBaud(38400); //Tell the module to go to the chosen baud rate. Ignore the response msg
+    softSerial.begin(38400); //Start the software serial port, this time at user's chosen baud rate
+    while (!softSerial); //Wait for port to open
+    while (softSerial.available()) softSerial.read();delay(200);
+    if(nanoGetVersion()){
+      if (nanoSetTagProtocol()){//Set protocol to GEN2
+        if (nanoSetAntennaPort()){
+          if (nanoSetRegion(REGION_EUROPE)){
+            if (nanoSetReadPower(pwr)){
+              return true;
+            }else return false;
+          }else return false;
+        }else return false;
+      }else return false;
+    }else return false;
+  } 
+    rfidBusy=false;
+}
+bool nanoGetVersion(){
+  for (uint8_t i = 0; i < 3; i++){
+    nano.getVersion();
+    if (parseResponse(0, nano.msg[0])){return true;i=3;break;}else {return false;}
+  }
+}
+bool nanoSetTagProtocol(){
+  for (uint8_t i = 0; i < 3; i++){
+    nano.setTagProtocol();
+    if (parseResponse(1, nano.msg[0])){return true;i=3;break;}else {return false;}
+  }
+}
+bool nanoSetAntennaPort(){
+  for(uint8_t i = 0; i < 3; i++){
+    nano.setAntennaPort();
+        if (parseResponse(2, nano.msg[0])){return true;i=3;break;}else {return false;}
+  }
+}
+bool nanoSetRegion(uint8_t nanoRegion){
+  for(uint8_t i = 0; i < 3; i++){
+    nano.setRegion(nanoRegion);
+        if (parseResponse(3, nano.msg[0])){return true;i=3;break;}else {return false;}
+  }
+}
+bool nanoSetReadPower(uint16_t nanoPower){
+  for(uint8_t i = 0; i < 3; i++){
+    nano.setReadPower(nanoPower);
+        if (parseResponse(4, nano.msg[0])){return true;i=3;break;}else {return false;}
+  }
+}
+bool nanoStopReading(){
+  for(uint8_t i = 0; i < 3; i++){
+    nano.stopReading();
+    if (nano.msg[0]==ALL_GOOD){
+      Serial.println(F("nano.msg[0].stopReading = ALL GOOD"));
+      return true;
+    }else{i=3;
+      return false;
+      break;
+    }    
+  }
+}
+bool parseResponse(uint8_t ID, uint8_t msg){
+  Serial.print(" nano.msg[0].");Serial.print(ID);Serial.print(" = ");Serial.println(nano.msg[0],HEX);
+  switch (msg)
+  {
+    case ALL_GOOD:
+      Serial.print(ID);Serial.println(": OK");
+      rfidBusy=false;
+      // nanoStartupOK=true;
+      nano.msg[0]=1;
+      return true;
+      break;
+    case ERROR_WRONG_OPCODE_RESPONSE:
+      nanoStopReading();
+      Serial.print(ID);Serial.println(F("Continuous reading. Stopping..."));
+      delay(1500);
+      break;
+    case ERROR_COMMAND_RESPONSE_TIMEOUT:
+      Serial.print(ID);Serial.println(F(": _COMMAND_RESPONSE_TIMEOUT"));
+      return false;
+      break;
+    case ERROR_CORRUPT_RESPONSE:
+      Serial.print(ID);Serial.println(F(": _CORRUPT_RESPONSE"));
+      return false;
+      break;
+    case ERROR_UNKNOWN_OPCODE:
+      Serial.print(ID);Serial.println(F(": _UNKNOWN_OPCODE"));
+      return false;
+      break;
+    case RESPONSE_IS_TEMPERATURE:
+      Serial.print(ID);Serial.println(F(": _IS_TEMPERATURE"));
+      return false;
+      nanoStopReading();
+      break;
+    case RESPONSE_IS_KEEPALIVE:
+      Serial.print(ID);Serial.println(F(": _IS_KEEPALIVE"));
+      return false;
+      break;
+    case RESPONSE_IS_TEMPTHROTTLE:
+      Serial.print(ID);Serial.println(F(": _IS_TEMPTHROTTLE"));
+      return false;
+      nanoStopReading();
+      break;
+    case RESPONSE_IS_TAGFOUND:
+      Serial.print(ID);Serial.println(F(": _IS_TAGFOUND"));
+      return false;
+      break;
+    case RESPONSE_IS_NOTAGFOUND:
+      Serial.print(ID);Serial.println(F(": _IS_NOTAGFOUND"));
+      break;
+    case RESPONSE_IS_UNKNOWN:
+      Serial.print(ID);Serial.println(F(": _IS_UNKNOWN"));
+      return false;
+      nanoStopReading();
+      break;
+    case RESPONSE_SUCCESS:
+      Serial.print(ID);Serial.println(F(": _SUCCESS"));
+      return false;
+      break;
+    case RESPONSE_FAIL:
+      Serial.print(ID);Serial.println(F(": _FAIL"));
+      return false;
+      break;
+    default:
+      Serial.print(ID);Serial.println(F(": ???"));
+      return false;
+      break;
+  }
 }
