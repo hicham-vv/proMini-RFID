@@ -158,7 +158,15 @@ void requestEvent(){
       }else if(myData.tagEPC[M][i]<=15){
         tagInfo+="0";tagInfo+=String(myData.tagEPC[M][i],HEX);
       }else tagInfo+=String(myData.tagEPC[M][i],HEX);
+    }tagInfo+=",";
+    if (myData.winnerRSSI[M]>-10){
+      tagInfo+="-";tagInfo+="00";tagInfo+=abs(myData.winnerRSSI[M]);
+    }else if ((myData.winnerRSSI[M]<-10)&&(myData.winnerRSSI[M]>-100)){
+      tagInfo+="-";tagInfo+="0";tagInfo+=abs(myData.winnerRSSI[M]);
+    }else if (myData.winnerRSSI[M]<-100){
+      tagInfo+=String(myData.winnerRSSI[M]);
     }
+    
     #ifdef debug
     Serial.print("tagInfo = ");Serial.println(tagInfo);
     #endif
