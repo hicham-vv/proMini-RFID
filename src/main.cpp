@@ -166,7 +166,6 @@ void requestEvent(){
     }else if (myData.winnerRSSI[M]<-100){
       tagInfo+=String(myData.winnerRSSI[M]);
     }
-    
     #ifdef debug
     Serial.print("tagInfo = ");Serial.println(tagInfo);
     #endif
