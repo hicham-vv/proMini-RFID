@@ -159,7 +159,7 @@ void requestEvent(){
         tagInfo+="0";tagInfo+=String(myData.tagEPC[M][i],HEX);
       }else tagInfo+=String(myData.tagEPC[M][i],HEX);
     }
-    if (tagInfo.toInt()!=0)
+    if (tagInfo!="000000000000000000000000")
     {
       tagInfo+=",";
       if (myData.winnerRSSI[M]>-10){
@@ -170,14 +170,23 @@ void requestEvent(){
         tagInfo+=String(myData.winnerRSSI[M]);
         myData.winnerRSSI[M]=0;
       }
+      tagInfo+="*";
+      #ifdef debug
+      Serial.print("tagInfo = ");Serial.println(tagInfo);
+      #endif
+      Wire.write(tagInfo.c_str());
+      delay(5);
+    }else
+    {
+      tagInfo="#";
       #ifdef debug
       Serial.print("tagInfo = ");Serial.println(tagInfo);
       #endif
       Wire.write(tagInfo.c_str());
       delay(5);
     }
+    
     M++;
-    tagInfo="\n";
   }
     for (uint8_t j = 0; j < 12; j++){
       myData.tagEPC[M-1][j]={{0x00}};
