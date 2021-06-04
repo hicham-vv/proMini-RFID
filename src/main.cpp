@@ -1,7 +1,7 @@
 #include "SparkFun_UHF_RFID_Reader.h" //Library for controlling the M6E Nano module
 #include <SoftwareSerial.h>
 #include <Wire.h>
-#define debug
+// #define debug
 #define rfidRxPin 3;
 #define rfidTxPin 2;
 
@@ -62,6 +62,7 @@ void setup()
   Wire.onRequest(requestEvent); // register event
   Wire.onReceive(receiveEvent); // register event
   nano.disableDebugging();
+  // nano.enableDebugging();
 }
 
 void loop(){
