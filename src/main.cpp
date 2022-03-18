@@ -1,23 +1,18 @@
 #include "SparkFun_UHF_RFID_Reader.h" //Library for controlling the M6E Nano module
 #include <SoftwareSerial.h>
 #include <Wire.h>
-#define debug
-
-#define RFIDEN 12 // D3
 // #define debug
-#define rfidRxPin D1
-#define rfidTxPin D2
+#define rfidRxPin 3;
+#define rfidTxPin 2;
 
-SoftwareSerial nanoSerial(rfidRxPin, rfidTxPin); 
-
-
-
+SoftwareSerial nanoSerial(2, 3); 
 uint16_t pwr = 0;
-uint16_t time1= 0; 
+uint16_t time= 0; 
 uint16_t start = 0;
 uint16_t tagFoundCount=0;
 bool rfidStartup = true;
 
+#define RFIDEN 4
 String tagInfo="";
 uint8_t M=0;
 char allTags[89]={0};
@@ -59,48 +54,25 @@ void rfidRestart();
 void setup()
 {
   #ifdef debug
-  Serial.begin(115200);
-  while(!Serial);
   #endif
-
-
-
-  nanoSerial.begin(115200);
-  while(!nanoSerial);
-
-  nano.begin(Serial);
-
-
+  Serial.begin(115200);
   Serial.println("Setup Start");
-  Serial.println("Hello");
-  // while(true){
-  //   Serial.println("Hello");
-  //   delay(500);
-  // }
-  pwr=500;
   rfidOFF();
-  rfidON();
-  while (true)
-  {
-    Serial.println("Hello");
-    delay(500);
-  }
-  
-  // Wire.begin(8);
-  // Wire.onRequest(requestEvent); // register event
-  // Wire.onReceive(receiveEvent); // register event
-  // nano.disableDebugging();
-  nano.enableDebugging();
+  Wire.begin(8);
+  Wire.onRequest(requestEvent); // register event
+  Wire.onReceive(receiveEvent); // register event
+  nano.disableDebugging();
+  // nano.enableDebugging();
 }
 
 void loop(){
-  // if (receptionFlag && !rfidBusy){
-  //   rfidBusy=true;
-  //   receptionFlag=false;
-  //   rfidON();
+  if (receptionFlag && !rfidBusy){
+    rfidBusy=true;
+    receptionFlag=false;
+    rfidON();
     nano.startReading(); //Begin scanning for tags
     previousMillis=millis();
-    while((millis()-previousMillis)<5000){
+    while((millis()-previousMillis)<time){
       if (nano.check() == true) //Check to see if any new data has come in from module
       { 
         byte responseType = nano.parseResponse(); //Break response into tag ID, RSSI, frequency, and timestamp
@@ -113,7 +85,6 @@ void loop(){
           break;
         
         case RESPONSE_IS_TAGFOUND:
-        {
           #ifdef debug
           Serial.print("TAG is found # ");Serial.println(tagFoundCount++);
           #endif
@@ -125,25 +96,24 @@ void loop(){
             }
             mmyEPC[x]=nano.msg[31+x];
           }
-          for(byte j=0;j<10;j++){
-            if (memcmp(mmyEPC,myData.tagEPC[j],12)==0){
-              if (rssi>myData.winnerRSSI[j]){
-                myData.winnerRSSI[j]=rssi;
-              }
-              break;
-            }
-            else{
-              if(memcmp(myData.tagEPC[j],zeroEPC,12)==0){
-                for(byte jj=0;jj<12;jj++){
-                  myData.tagEPC[j][jj]=mmyEPC[jj];
+            for(byte j=0;j<10;j++){
+              if (memcmp(mmyEPC,myData.tagEPC[j],12)==0){
+                if (rssi>myData.winnerRSSI[j]){
                   myData.winnerRSSI[j]=rssi;
                 }
                 break;
               }
+              else{
+                if(memcmp(myData.tagEPC[j],zeroEPC,12)==0){
+                  for(byte jj=0;jj<12;jj++){
+                    myData.tagEPC[j][jj]=mmyEPC[jj];
+                    myData.winnerRSSI[j]=rssi;
+                  }
+                break;
+                }
+              }
             }
-          }
-        }
-        break;
+          break;
         
         case ERROR_CORRUPT_RESPONSE:
           #ifdef debug
@@ -162,11 +132,11 @@ void loop(){
     nano.stopReading();
     delay(1000);
     rfidBusy=false;
-  // }
-  // if (requestFlag && !rfidBusy){
-  //   requestFlag=false;
-  //   rfidOFF();
-  // }
+  }
+  if (requestFlag && !rfidBusy){
+    requestFlag=false;
+    rfidOFF();
+  }
 }
 void restartRFID(){
   rfidBusy=true;
@@ -220,7 +190,7 @@ void requestEvent(){
     M++;
   }
     for (uint8_t j = 0; j < 12; j++){
-      myData.tagEPC[M-1][j]={0x00};
+      myData.tagEPC[M-1][j]={{0x00}};
     }
     requestFlag = true;
 }
@@ -240,14 +210,14 @@ void receiveEvent(int howMany) {
     uint8_t ind2=command.indexOf(',',ind1+1);
     uint8_t ind3=command.indexOf(',',ind2+1);
     start = command.substring(0,1).toInt();
-    time1= command.substring(ind1+1,ind2).toInt(); 
+    time= command.substring(ind1+1,ind2).toInt(); 
     pwr = command.substring(ind2+1,strlen(command.c_str())).toInt();
     #ifdef debug
     Serial.print("ind1 = ");Serial.println(ind1);
     Serial.print("ind2 = ");Serial.println(ind2);
     Serial.print("ind3 = ");Serial.println(ind3);
     Serial.print("start = ");Serial.println(start);
-    Serial.print("time1 = ");Serial.println(time1);
+    Serial.print("time = ");Serial.println(time);
     Serial.print("pwr = "); Serial.println(pwr);
     #endif
   }
@@ -262,13 +232,9 @@ bool setupNano(){
     #endif
     rfidBusy=true;
     nano.begin(nanoSerial);
-    Serial.println("!!!!!");
-    nanoSerial.begin(9600);
-    // while (nanoSerial.isListening() == false);
-    while (nanoSerial.available()){
-      nanoSerial.read();
-      delay(10);
-    }
+    nanoSerial.begin(115200); 
+    while (nanoSerial.isListening() == false);
+    while (nanoSerial.available()) nanoSerial.read();delay(200);
     nano.setBaud(38400); 
     nanoSerial.begin(38400); 
     delay(250);
@@ -293,49 +259,31 @@ bool setupNano(){
 }
 bool nanoGetVersion(){
   nano.getVersion();
-  if (parseResponse(0, nano.msg[0])){
-    return true;
-  }
-  else{
-    return false;
-  }
+  if (parseResponse(0, nano.msg[0])){return true;i=3;}else {return false;}
 }
 bool nanoSetTagProtocol(){
   for (uint8_t i = 0; i < 3; i++){
     nano.setTagProtocol();
-    if (parseResponse(1, nano.msg[0])){
-      return true;
-    }
+    if (parseResponse(1, nano.msg[0])){return true;i=3;break;}else {return false;}
   }
-  return false;
 }
-
 bool nanoSetAntennaPort(){
   for(uint8_t i = 0; i < 3; i++){
     nano.setAntennaPort();
-    if (parseResponse(2, nano.msg[0])){
-      return true;
-    }
+        if (parseResponse(2, nano.msg[0])){return true;i=3;break;}else {return false;}
   }
-  return false;
 }
 bool nanoSetRegion(uint8_t nanoRegion){
   for(uint8_t i = 0; i < 3; i++){
     nano.setRegion(nanoRegion);
-    if (parseResponse(3, nano.msg[0])){
-      return true;
-    }
+        if (parseResponse(3, nano.msg[0])){return true;i=3;break;}else {return false;}
   }
-  return false;
 }
 bool nanoSetReadPower(uint16_t nanoPower){
   for(uint8_t i = 0; i < 3; i++){
     nano.setReadPower(nanoPower);
-    if (parseResponse(4, nano.msg[0])){
-      return true;
-    }
+        if (parseResponse(4, nano.msg[0])){return true;i=3;break;}else {return false;}
   }
-  return false;
 }
 bool nanoStopReading(){
   for(uint8_t i = 0; i < 3; i++){
@@ -345,9 +293,11 @@ bool nanoStopReading(){
       Serial.println(F("nano.msg[0].stopReading = ALL GOOD"));
       #endif
       return true;
-    }
+    }else{i=3;
+      return false;
+      break;
+    }    
   }
-  return false;
 }
 bool parseResponse(uint8_t ID, uint8_t msg){
   #ifdef debug
@@ -369,7 +319,7 @@ bool parseResponse(uint8_t ID, uint8_t msg){
       Serial.print(ID);Serial.println(F("Continuous reading. Stopping..."));
       #endif
       nanoStopReading();
-      delay(1000);
+      delay(1500);
       break;
     case ERROR_COMMAND_RESPONSE_TIMEOUT:
       #ifdef debug
@@ -450,25 +400,18 @@ bool parseResponse(uint8_t ID, uint8_t msg){
       return false;
       break;
   }
-  return false;
 }
 void rfidON(){
   pinMode(RFIDEN,OUTPUT);
   #ifdef debug
   Serial.println("rfidON");
   #endif
-  Serial.println("loop");
-  delay(1000);
-  
-  digitalWrite(RFIDEN,LOW);
-  Serial.println("RFID OFFFFFF");
+  digitalWrite(3,LOW);
   delay(40);
   digitalWrite(RFIDEN,HIGH);
-
-  Serial.println("RFID ONNNNNNNNNNN");
   delay(40);
+  SoftwareSerial nanoSerial(2, 3); 
   setupNano();
-  
   rfidStartup=true;
 }
 void rfidOFF(){
@@ -476,7 +419,7 @@ void rfidOFF(){
   #ifdef debug
   Serial.println("rfidOFF");
   #endif  
-  digitalWrite(RFIDEN,LOW);
+  digitalWrite(3,LOW);
   delay(40);
   digitalWrite(RFIDEN,LOW);
   rfidStartup=true;
