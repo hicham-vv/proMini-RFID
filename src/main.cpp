@@ -85,6 +85,7 @@ void loop(){
           break;
         
         case RESPONSE_IS_TAGFOUND:
+        {
           #ifdef debug
           Serial.print("TAG is found # ");Serial.println(tagFoundCount++);
           #endif
@@ -113,6 +114,7 @@ void loop(){
                 }
               }
             }
+        }
           break;
         
         case ERROR_CORRUPT_RESPONSE:
@@ -190,7 +192,7 @@ void requestEvent(){
     M++;
   }
     for (uint8_t j = 0; j < 12; j++){
-      myData.tagEPC[M-1][j]={{0x00}};
+      myData.tagEPC[M-1][j]={0x00};
     }
     requestFlag = true;
 }
@@ -234,7 +236,10 @@ bool setupNano(){
     nano.begin(nanoSerial);
     nanoSerial.begin(115200); 
     while (nanoSerial.isListening() == false);
-    while (nanoSerial.available()) nanoSerial.read();delay(200);
+    while (nanoSerial.available()){
+      nanoSerial.read();
+    }
+    delay(200);
     nano.setBaud(38400); 
     nanoSerial.begin(38400); 
     delay(250);
