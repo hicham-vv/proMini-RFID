@@ -2,8 +2,8 @@
 #include <SoftwareSerial.h>
 #include <Wire.h>
 // #define debug
-#define rfidRxPin 3;
-#define rfidTxPin 2;
+#define rfidRxPin 3
+#define rfidTxPin 2
 
 SoftwareSerial nanoSerial(2, 3); 
 uint16_t pwr = 0;
